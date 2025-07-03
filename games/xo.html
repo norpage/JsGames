@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tic-Tac-Toe</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            background: linear-gradient(to bottom, #74ebd5, #acb6e5);
+            font-family: Arial, sans-serif;
+        }
+
+        #gameContainer {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+            text-align: center;
+            position: relative;
+        }
+
+        #modeSelection {
+            margin-bottom: 20px;
+        }
+
+        #scoreBoard {
+            margin: 10px 0;
+            font-size: 18px;
+            color: #333;
+        }
+
+        #gameBoard {
+            display: grid;
+            grid-template-columns: repeat(3, 100px);
+            gap: 10px;
+            background-color: #bbada0;
+            padding: 10px;
+            border-radius: 10px;
+            margin: 20px auto;
+            position: relative;
+        }
+
+        .cell {
+            width: 100px;
+            height: 100px;
+            background-color: #cdc1b4;
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 48px;
+            font-weight: bold;
+            color: #776e65;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        .cell:hover {
+            background-color: #d3c7b9;
+        }
+
+        .cell.x::before {
+            content: 'X';
+            color: #f65e3b;
+            animation: appear 0.4s ease;
+        }
+
+        .cell.o::before {
+            content: 'O';
+            color: #4caf50;
+            animation: appear 0.4s ease;
+        }
+
+        @keyframes appear {
+            from { transform: scale(0); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        #status {
+            font-size: 24px;
+            margin: 20px 0;
+            color: #333;
+        }
+
+        button, .menu-button {
+            padding: 12px 24px;
+            font-size: 16px;
+            background-color: #4caf50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            margin: 10px;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        button:hover, .menu-button:hover {
+            background-color: #45a049;
+        }
+
+        #gameOver {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        #gameOver h2 {
+            margin: 0 0 10px;
+        }
+
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+        }
+
+        /* Ռեսպոնսիվ դիզայն */
+        @media (max-width: 400px) {
+            #gameBoard {
+                grid-template-columns: repeat(3, 80px);
+            }
+
+            .cell {
+                width: 80px;
+                height: 80px;
+                font-size: 36px;
+            }
+
+            #status {
+                font-size: 20px;
+            }
+
+            button {
+                padding: 10px 20px;
+                font-size: 14px;
+            }
+        }
+        .menu-button {
+            display: inline-block;
+            padding: 12px 24px;
+            font-size: 16px;
+            background-color: #ff9800;
+            /* Տարբեր գույն՝ տարբերելու համար */
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            margin-top: 10px;
+            transition: background-color 0.3s;
+        }
+
+        .menu-button:hover {
+            background-color: #e68900;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <div id="modeSelection">
+            <button onclick="startGame('twoPlayer')">Play vs Player</button>
+            <button onclick="startGame('computer')">Play vs Computer</button>
+        </div>
+        <div id="scoreBoard">
+            Score: X: <span id="xScore">0</span> | O: <span id="oScore">0</span>
+        </div>
+        <div id="status">Choose a mode to start</div>
+        <div id="gameBoard" style="display: none;">
+            <canvas id="winLine" width="320" height="320"></canvas>
+        </div>
+        <button onclick="startGame(currentMode)" style="display: none;">Restart Game</button>
+        <a href="../games.html" class="menu-button">Back to Menu</a>
+        <div id="gameOver">
+            <h2 id="gameResult"></h2>
+            <button onclick="startGame(currentMode)">Play Again</button>
+        </div>
+        <audio id="clickSound" src="sounds/click.mp3"></audio>
+        <audio id="winSound" src="sounds/win.mp3"></audio>
+    </div>
+
+    <script>
+        const gameBoard = document.getElementById('gameBoard');
+        const statusDisplay = document.getElementById('status');
+        const gameOverScreen = document.getElementById('gameOver');
+        const gameResult = document.getElementById('gameResult');
+        const restartButton = document.querySelector('button[onclick*="startGame"]');
+        const xScoreDisplay = document.getElementById('xScore');
+        const oScoreDisplay = document.getElementById('oScore');
+        const canvas = document.getElementById('winLine');
+        const ctx = canvas.getContext('2d');
+        const clickSound = document.getElementById('clickSound');
+        const winSound = document.getElementById('winSound');
+        let board = ['', '', '', '', '', '', '', '', ''];
+        let currentPlayer = 'X';
+        let gameActive = false;
+        let currentMode = null;
+        let xScore = 0;
+        let oScore = 0;
+        let winningPattern = null;
+
+        // Խաղի մեկնարկ
+        function startGame(mode) {
+            currentMode = mode;
+            board = ['', '', '', '', '', '', '', '', ''];
+            currentPlayer = 'X';
+            gameActive = true;
+            winningPattern = null;
+            statusDisplay.textContent = `Player ${currentPlayer}'s Turn`;
+            gameOverScreen.style.display = 'none';
+            gameBoard.style.display = 'grid';
+            restartButton.style.display = 'inline-block';
+            document.getElementById('modeSelection').style.display = 'none';
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawBoard();
+        }
+
+        // Ցանցի նկարում
+        function drawBoard() {
+            gameBoard.innerHTML = '<canvas id="winLine" width="320" height="320"></canvas>';
+            board.forEach((value, index) => {
+                const cell = document.createElement('div');
+                cell.classList.add('cell');
+                if (value) cell.classList.add(value.toLowerCase());
+                cell.addEventListener('click', () => handleCellClick(index));
+                gameBoard.appendChild(cell);
+            });
+        }
+
+        // Բջիջ սեղմելու գործողություն
+        function handleCellClick(index) {
+            if (board[index] || !gameActive) return;
+            clickSound.play();
+            board[index] = currentPlayer;
+            drawBoard();
+            if (checkWin()) {
+                updateScore(currentPlayer);
+                gameResult.textContent = `Player ${currentPlayer} Wins!`;
+                gameOverScreen.style.display = 'block';
+                gameActive = false;
+                winSound.play();
+                drawWinLine();
+                return;
+            }
+            if (board.every(cell => cell)) {
+                gameResult.textContent = "It's a Tie!";
+                gameOverScreen.style.display = 'block';
+                gameActive = false;
+                return;
+            }
+            currentPlayer = currentPlayer === 'X' ? 'O' : 'X';
+            statusDisplay.textContent = `Player ${currentPlayer}'s Turn`;
+
+            // Եթե համակարգչի հերթն է
+            if (currentMode === 'computer' && currentPlayer === 'O' && gameActive) {
+                setTimeout(computerMove, 500);
+            }
+        }
+
+        // Հաշվի թարմացում
+        function updateScore(winner) {
+            if (winner === 'X') {
+                xScore++;
+                xScoreDisplay.textContent = xScore;
+            } else if (winner === 'O') {
+                oScore++;
+                oScoreDisplay.textContent = oScore;
+            }
+        }
+
+        // Համակարգչի քայլ Minimax-ով
+        function computerMove() {
+            const bestMove = getBestMove(board, 'O');
+            board[bestMove.index] = 'O';
+            clickSound.play();
+            drawBoard();
+            if (checkWin()) {
+                updateScore('O');
+                gameResult.textContent = 'Computer Wins!';
+                gameOverScreen.style.display = 'block';
+                gameActive = false;
+                winSound.play();
+                drawWinLine();
+                return;
+            }
+            if (board.every(cell => cell)) {
+                gameResult.textContent = "It's a Tie!";
+                gameOverScreen.style.display = 'block';
+                gameActive = false;
+                return;
+            }
+            currentPlayer = 'X';
+            statusDisplay.textContent = `Player ${currentPlayer}'s Turn`;
+        }
+
+        // Minimax ալգորիթմ
+        function getBestMove(board, player) {
+            const opponent = player === 'O' ? 'X' : 'O';
+            let bestScore = player === 'O' ? -Infinity : Infinity;
+            let bestMove = null;
+
+            const emptyCells = board
+                .map((value, index) => (value === '' ? index : null))
+                .filter(index => index !== null);
+
+            for (let i of emptyCells) {
+                board[i] = player;
+                let score = minimax(board, 0, false, player, opponent);
+                board[i] = '';
+                if (player === 'O') {
+                    if (score > bestScore) {
+                        bestScore = score;
+                        bestMove = i;
+                    }
+                } else {
+                    if (score < bestScore) {
+                        bestScore = score;
+                        bestMove = i;
+                    }
+                }
+            }
+            return { index: bestMove, score: bestScore };
+        }
+
+        function minimax(board, depth, isMaximizing, player, opponent) {
+            const result = checkWinner();
+            if (result !== null) {
+                if (result === player) return 10 - depth;
+                if (result === opponent) return depth - 10;
+                return 0;
+            }
+
+            const emptyCells = board
+                .map((value, index) => (value === '' ? index : null))
+                .filter(index => index !== null);
+
+            if (isMaximizing) {
+                let bestScore = -Infinity;
+                for (let i of emptyCells) {
+                    board[i] = player;
+                    let score = minimax(board, depth + 1, false, player, opponent);
+                    board[i] = '';
+                    bestScore = Math.max(score, bestScore);
+                }
+                return bestScore;
+            } else {
+                let bestScore = Infinity;
+                for (let i of emptyCells) {
+                    board[i] = opponent;
+                    let score = minimax(board, depth + 1, true, player, opponent);
+                    board[i] = '';
+                    bestScore = Math.min(score, bestScore);
+                }
+                return bestScore;
+            }
+        }
+
+        // Հաղթանակի ստուգում
+        function checkWin() {
+            const winPatterns = [
+                [0, 1, 2], [3, 4, 5], [6, 7, 8], // Տողեր
+                [0, 3, 6], [1, 4, 7], [2, 5, 8], // Սյուներ
+                [0, 4, 8], [2, 4, 6] // Անկյունագծեր
+            ];
+            for (let pattern of winPatterns) {
+                if (pattern.every(index => board[index] === currentPlayer)) {
+                    winningPattern = pattern;
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        function checkWinner() {
+            const winPatterns = [
+                [0, 1, 2], [3, 4, 5], [6, 7, 8],
+                [0, 3, 6], [1, 4, 7], [2, 5, 8],
+                [0, 4, 8], [2, 4, 6]
+            ];
+            for (let pattern of winPatterns) {
+                if (pattern.every(index => board[index] === 'O')) return 'O';
+                if (pattern.every(index => board[index] === 'X')) return 'X';
+            }
+            if (board.every(cell => cell)) return 'tie';
+            return null;
+        }
+
+        // Հաղթանակի գծի նկարում
+        function drawWinLine() {
+            if (!winningPattern) return;
+            ctx.strokeStyle = '#f65e3b';
+            ctx.lineWidth = 5;
+            ctx.beginPath();
+
+            const cellSize = 100;
+            const padding = 10;
+            const offset = 35; // Կենտրոնի համար
+
+            const startCell = winningPattern[0];
+            const endCell = winningPattern[2];
+
+            const startX = (startCell % 3) * (cellSize + padding) + offset + padding;
+            const startY = Math.floor(startCell / 3) * (cellSize + padding) + offset + padding;
+            const endX = (endCell % 3) * (cellSize + padding) + offset + padding;
+            const endY = Math.floor(endCell / 3) * (cellSize + padding) + offset + padding;
+
+            ctx.moveTo(startX, startY);
+            ctx.lineTo(endX, endY);
+            ctx.stroke();
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="shortcut icon" href="../images/favicon.png" type="image/x-icon">
+    <title>Tetris Game</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background: linear-gradient(to bottom, #74ebd5, #acb6e5);
+            font-family: Arial, sans-serif;
+        }
+
+        #gameContainer {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+            display: flex;
+            flex-direction: row;
+            gap: 20px;
+        }
+
+        canvas {
+            border: 3px solid #333;
+            border-radius: 10px;
+        }
+
+        #scoreBoard {
+            text-align: center;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        #scoreBoard p {
+            margin: 10px 0;
+            font-size: 18px;
+            color: #333;
+        }
+
+        button {
+            padding: 12px 24px;
+            font-size: 16px;
+            background-color: #4caf50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        #gameOver {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        #gameOver h2 {
+            margin: 0 0 10px;
+        }
+
+        .menu-button {
+            display: inline-block;
+            padding: 12px 24px;
+            font-size: 16px;
+            background-color: #ff9800;
+            /* Տարբեր գույն՝ տարբերելու համար */
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            margin-top: 10px;
+            transition: background-color 0.3s;
+        }
+
+        .menu-button:hover {
+            background-color: #e68900;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="300" height="600"></canvas>
+        <div id="scoreBoard">
+            <p>Score: <span id="score">0</span></p>
+            <p>High Score: <span id="highScore">0</span></p>
+            <button id="startButton" onclick="startGame()">Start Game</button>
+            <a href="../games.html" class="menu-button">Back to Menu</a>
+        </div>
+        <div id="gameOver">
+            <h2>Game Over!</h2>
+            <p>Your Score: <span id="finalScore">0</span></p>
+            <button onclick="startGame()">Play Again</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreDisplay = document.getElementById('score');
+        const highScoreDisplay = document.getElementById('highScore');
+        const gameOverScreen = document.getElementById('gameOver');
+        const finalScoreDisplay = document.getElementById('finalScore');
+        const startButton = document.getElementById('startButton');
+
+        // Կարգավորումներ
+        const gridSize = 30; // Քառակուսու չափը
+        const cols = canvas.width / gridSize; // 10 սյուն
+        const rows = canvas.height / gridSize; // 20 տող
+        let board = Array(rows).fill().map(() => Array(cols).fill(0)); // Խաղի դաշտ
+        let currentPiece = null;
+        let score = 0;
+        let highScore = localStorage.getItem('highScore') || 0;
+        let gameSpeed = 1000; // Ֆիգուրն իջնում է ամեն վայրկյան
+        let gameLoop;
+
+        highScoreDisplay.textContent = highScore;
+
+        // Տետրոմինոների սահմանում
+        const pieces = [
+            [[1, 1, 1, 1]], // I
+            [[1, 1], [1, 1]], // O
+            [[1, 1, 1], [0, 1, 0]], // T
+            [[1, 1, 1], [1, 0, 0]], // L
+            [[1, 1, 1], [0, 0, 1]], // J
+            [[1, 1, 0], [0, 1, 1]], // S
+            [[0, 1, 1], [1, 1, 0]] // Z
+        ];
+        const colors = ['#00f0f0', '#f0f000', '#a000f0', '#f0a000', '#0000f0', '#00f000', '#f00000'];
+
+        // Ֆիգուրի օբյեկտ
+        class Piece {
+            constructor(shape, color) {
+                this.shape = shape;
+                this.color = color;
+                this.x = Math.floor(cols / 2) - Math.floor(shape[0].length / 2);
+                this.y = 0;
+            }
+
+            draw() {
+                ctx.fillStyle = this.color;
+                for (let r = 0; r < this.shape.length; r++) {
+                    for (let c = 0; c < this.shape[r].length; c++) {
+                        if (this.shape[r][c]) {
+                            ctx.fillRect(
+                                (this.x + c) * gridSize,
+                                (this.y + r) * gridSize,
+                                gridSize - 2,
+                                gridSize - 2
+                            );
+                        }
+                    }
+                }
+            }
+
+            move(dx, dy) {
+                this.x += dx;
+                this.y += dy;
+                if (this.collides()) {
+                    this.x -= dx;
+                    this.y -= dy;
+                    return false;
+                }
+                return true;
+            }
+
+            rotate() {
+                const newShape = Array(this.shape[0].length)
+                    .fill()
+                    .map((_, r) =>
+                        Array(this.shape.length)
+                            .fill()
+                            .map((_, c) => this.shape[this.shape.length - 1 - c][r])
+                    );
+                const oldShape = this.shape;
+                this.shape = newShape;
+                if (this.collides()) {
+                    this.shape = oldShape;
+                }
+            }
+
+            collides() {
+                for (let r = 0; r < this.shape.length; r++) {
+                    for (let c = 0; c < this.shape[r].length; c++) {
+                        if (this.shape[r][c]) {
+                            const newX = this.x + c;
+                            const newY = this.y + r;
+                            if (
+                                newX < 0 ||
+                                newX >= cols ||
+                                newY >= rows ||
+                                (newY >= 0 && board[newY][newX])
+                            ) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+                return false;
+            }
+        }
+
+        // Խաղի մեկնարկ
+        function startGame() {
+            board = Array(rows).fill().map(() => Array(cols).fill(0));
+            score = 0;
+            scoreDisplay.textContent = score;
+            gameOverScreen.style.display = 'none';
+            startButton.textContent = 'Restart Game';
+            clearInterval(gameLoop);
+            spawnPiece();
+            gameLoop = setInterval(update, gameSpeed);
+        }
+
+        // Նոր ֆիգուր
+        function spawnPiece() {
+            const index = Math.floor(Math.random() * pieces.length);
+            currentPiece = new Piece(pieces[index], colors[index]);
+            if (currentPiece.collides()) {
+                clearInterval(gameLoop);
+                gameOverScreen.style.display = 'block';
+                finalScoreDisplay.textContent = score;
+                if (score > highScore) {
+                    highScore = score;
+                    highScoreDisplay.textContent = highScore;
+                    localStorage.setItem('highScore', highScore);
+                }
+            }
+        }
+
+        // Թարմացնել խաղը
+        function update() {
+            if (!currentPiece.move(0, 1)) {
+                // Ֆիքսել ֆիգուրը
+                for (let r = 0; r < currentPiece.shape.length; r++) {
+                    for (let c = 0; c < currentPiece.shape[r].length; c++) {
+                        if (currentPiece.shape[r][c]) {
+                            board[currentPiece.y + r][currentPiece.x + c] = currentPiece.color;
+                        }
+                    }
+                }
+                clearLines();
+                spawnPiece();
+            }
+            draw();
+        }
+
+        // Ջնջել լրիվ տողերը
+        function clearLines() {
+            let linesCleared = 0;
+            for (let r = rows - 1; r >= 0; r--) {
+                if (board[r].every(cell => cell)) {
+                    board.splice(r, 1);
+                    board.unshift(Array(cols).fill(0));
+                    linesCleared++;
+                    r++;
+                }
+            }
+            if (linesCleared) {
+                score += linesCleared * 100;
+                scoreDisplay.textContent = score;
+                if (score > highScore) {
+                    highScore = score;
+                    highScoreDisplay.textContent = highScore;
+                    localStorage.setItem('highScore', highScore);
+                }
+            }
+        }
+
+        // Նկարել
+        function draw() {
+            ctx.fillStyle = '#f0f0f0';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Նկարել դաշտը
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    if (board[r][c]) {
+                        ctx.fillStyle = board[r][c];
+                        ctx.fillRect(c * gridSize, r * gridSize, gridSize - 2, gridSize - 2);
+                    }
+                }
+            }
+
+            // Նկարել ընթացիկ ֆիգուրը
+            currentPiece.draw();
+        }
+
+        // Կառավարում ստեղնաշարով
+        document.addEventListener('keydown', e => {
+            if (!currentPiece) return;
+            switch (e.key) {
+                case 'ArrowLeft':
+                    currentPiece.move(-1, 0);
+                    break;
+                case 'ArrowRight':
+                    currentPiece.move(1, 0);
+                    break;
+                case 'ArrowDown':
+                    currentPiece.move(0, 1);
+                    break;
+                case 'ArrowUp':
+                    currentPiece.rotate();
+                    break;
+            }
+            draw();
+        });
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="shortcut icon" href="../images/favicon.png" type="image/x-icon">
+    <title>Flappy Bird Game</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background: linear-gradient(to bottom, #74ebd5, #acb6e5);
+            font-family: Arial, sans-serif;
+        }
+
+        #gameContainer {
+            max-width: 640px;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+            text-align: center;
+        }
+
+        canvas {
+            border: 3px solid #333;
+            border-radius: 10px;
+        }
+
+        #scoreBoard {
+            margin: 20px 0;
+        }
+
+        #scoreBoard p {
+            margin: 5px;
+            font-size: 18px;
+            color: #333;
+        }
+
+        button {
+            padding: 12px 24px;
+            font-size: 16px;
+            background-color: #4caf50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        #gameOver {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        #gameOver h2 {
+            margin: 0 0 10px;
+        }
+
+        .menu-button {
+            display: inline-block;
+            padding: 12px 24px;
+            font-size: 16px;
+            background-color: #ff9800;
+            /* Տարբեր գույն՝ տարբերելու համար */
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            margin-top: 10px;
+            transition: background-color 0.3s;
+        }
+
+        .menu-button:hover {
+            background-color: #e68900;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="gameContainer">
+        <div id="scoreBoard">
+            <p>Score: <span id="score">0</span></p>
+            <p>High Score: <span id="highScore">0</span></p>
+        </div>
+        <canvas id="gameCanvas" width="600" height="400"></canvas>
+        <button id="startButton" onclick="startGame()">Start Game</button>
+        <a href="../games.html" class="menu-button">Back to Menu</a>
+
+        <div id="gameOver">
+            <h2>Game Over!</h2>
+            <p>Your Score: <span id="finalScore">0</span></p>
+            <button onclick="startGame()">Play Again</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreDisplay = document.getElementById('score');
+        const highScoreDisplay = document.getElementById('highScore');
+        const gameOverScreen = document.getElementById('gameOver');
+        const finalScoreDisplay = document.getElementById('finalScore');
+        const startButton = document.getElementById('startButton');
+
+        // Կարգավորումներ
+        const bird = {
+            x: 100,
+            y: canvas.height / 2,
+            size: 20,
+            velocity: 0,
+            gravity: 0.5,
+            jump: -8
+        };
+        const pipeWidth = 50;
+        const pipeGap = 120;
+        let pipes = [];
+        let score = 0;
+        let highScore = localStorage.getItem('highScore') || 0;
+        let gameRunning = false;
+        let frameCount = 0;
+
+        highScoreDisplay.textContent = highScore;
+
+        // Խաղի մեկնարկ
+        function startGame() {
+            bird.y = canvas.height / 2;
+            bird.velocity = 0;
+            pipes = [];
+            score = 0;
+            scoreDisplay.textContent = score;
+            gameOverScreen.style.display = 'none';
+            startButton.textContent = 'Restart Game';
+            gameRunning = true;
+            frameCount = 0;
+            gameLoop();
+        }
+
+        // Խաղի ցիկլ
+        function gameLoop() {
+            if (!gameRunning) return;
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Թարմացնել վիճակը
+        function update() {
+            frameCount++;
+
+            // Թռչուն
+            bird.velocity += bird.gravity;
+            bird.y += bird.velocity;
+            if (bird.y + bird.size > canvas.height || bird.y < 0) {
+                endGame();
+            }
+
+            // Խողովակներ
+            if (frameCount % 90 === 0) {
+                const pipeHeight = Math.random() * (canvas.height - pipeGap - 100) + 50;
+                pipes.push({
+                    x: canvas.width,
+                    top: pipeHeight,
+                    bottom: pipeHeight + pipeGap,
+                    scored: false
+                });
+            }
+
+            pipes.forEach(pipe => {
+                pipe.x -= 3;
+                // Բախում
+                if (
+                    bird.x + bird.size > pipe.x &&
+                    bird.x < pipe.x + pipeWidth &&
+                    (bird.y < pipe.top || bird.y + bird.size > pipe.bottom)
+                ) {
+                    endGame();
+                }
+                // Միավոր
+                if (!pipe.scored && bird.x > pipe.x + pipeWidth) {
+                    score++;
+                    scoreDisplay.textContent = score;
+                    if (score > highScore) {
+                        highScore = score;
+                        highScoreDisplay.textContent = highScore;
+                        localStorage.setItem('highScore', highScore);
+                    }
+                    pipe.scored = true;
+                }
+            });
+
+            // Հեռացնել էկրանից դուրս եկած խողովակները
+            pipes = pipes.filter(pipe => pipe.x + pipeWidth > 0);
+        }
+
+        // Նկարել
+        function draw() {
+            // Ֆոն
+            ctx.fillStyle = '#f0f0f0';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Թռչուն
+            ctx.fillStyle = '#ff4444';
+            ctx.beginPath();
+            ctx.arc(bird.x, bird.y, bird.size / 2, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Խողովակներ
+            ctx.fillStyle = '#4caf50';
+            pipes.forEach(pipe => {
+                ctx.fillRect(pipe.x, 0, pipeWidth, pipe.top);
+                ctx.fillRect(pipe.x, pipe.bottom, pipeWidth, canvas.height - pipe.bottom);
+            });
+        }
+
+        // Խաղի ավարտ
+        function endGame() {
+            gameRunning = false;
+            gameOverScreen.style.display = 'block';
+            finalScoreDisplay.textContent = score;
+        }
+
+        // Ստեղնաշարի կառավարում
+        document.addEventListener('keydown', e => {
+            if (e.code === 'ArrowUp' && gameRunning) {
+                bird.velocity = bird.jump;
+            }
+        });
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="shortcut icon" href="../images/favicon.png" type="image/x-icon">
+    <title>Memory Game</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background: linear-gradient(to bottom, #74ebd5, #acb6e5);
+            font-family: Arial, sans-serif;
+        }
+
+        #gameContainer {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+            text-align: center;
+        }
+
+        #gameBoard {
+            display: grid;
+            grid-template-columns: repeat(4, 80px);
+            gap: 10px;
+            margin: 20px auto;
+        }
+
+        .card {
+            width: 80px;
+            height: 80px;
+            background-color: #4caf50;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0;
+            color: white;
+            cursor: pointer;
+            transition: transform 0.3s, background-color 0.3s;
+        }
+
+        .card.flipped {
+            background-color: #2196f3;
+            font-size: 24px;
+            transform: rotateY(180deg);
+        }
+
+        .card.matched {
+            background-color: #ff9800;
+            cursor: default;
+        }
+
+        #scoreBoard {
+            margin: 20px 0;
+        }
+
+        #scoreBoard p {
+            margin: 5px;
+            font-size: 18px;
+            color: #333;
+        }
+
+        button {
+            padding: 12px 24px;
+            font-size: 16px;
+            background-color: #4caf50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        #gameOver {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        #gameOver h2 {
+            margin: 0 0 10px;
+        }
+
+        .menu-button {
+            display: inline-block;
+            padding: 12px 24px;
+            font-size: 16px;
+            background-color: #ff9800;
+            /* Տարբեր գույն՝ տարբերելու համար */
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            margin-top: 10px;
+            transition: background-color 0.3s;
+        }
+
+        .menu-button:hover {
+            background-color: #e68900;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="gameContainer">
+        <div id="scoreBoard">
+            <p>Score: <span id="score">0</span></p>
+            <p>High Score: <span id="highScore">0</span></p>
+        </div>
+        <div id="gameBoard"></div>
+        <button id="startButton" onclick="startGame()">Start Game</button>
+        <a href="../games.html" class="menu-button">Back to Menu</a>
+
+        <div id="gameOver">
+            <h2>Congratulations!</h2>
+            <p>Your Score: <span id="finalScore">0</span></p>
+            <button onclick="startGame()">Play Again</button>
+        </div>
+    </div>
+
+    <script>
+        const gameBoard = document.getElementById('gameBoard');
+        const scoreDisplay = document.getElementById('score');
+        const highScoreDisplay = document.getElementById('highScore');
+        const gameOverScreen = document.getElementById('gameOver');
+        const finalScoreDisplay = document.getElementById('finalScore');
+        const startButton = document.getElementById('startButton');
+
+        let cards = [];
+        let flippedCards = [];
+        let matchedPairs = 0;
+        let score = 0;
+        let highScore = localStorage.getItem('highScore') || 0;
+        highScoreDisplay.textContent = highScore;
+
+        // Քարտերի ստեղծում
+        function createBoard() {
+            const symbols = ['😺', '🐶', '🦁', '🐻', '🐼', '🐨', '🦒', '🦊'];
+            const deck = [...symbols, ...symbols].sort(() => Math.random() - 0.5);
+            gameBoard.innerHTML = '';
+            cards = deck.map((symbol, index) => {
+                const card = document.createElement('div');
+                card.classList.add('card');
+                card.dataset.symbol = symbol;
+                card.addEventListener('click', () => flipCard(card));
+                gameBoard.appendChild(card);
+                return card;
+            });
+        }
+
+        // Խաղի մեկնարկ
+        function startGame() {
+            score = 0;
+            scoreDisplay.textContent = score;
+            matchedPairs = 0;
+            flippedCards = [];
+            gameOverScreen.style.display = 'none';
+            startButton.textContent = 'Restart Game';
+            createBoard();
+        }
+
+        // Քարտի բացում
+        function flipCard(card) {
+            if (
+                flippedCards.length < 2 &&
+                !card.classList.contains('flipped') &&
+                !card.classList.contains('matched')
+            ) {
+                card.classList.add('flipped');
+                card.textContent = card.dataset.symbol;
+                flippedCards.push(card);
+
+                if (flippedCards.length === 2) {
+                    checkMatch();
+                }
+            }
+        }
+
+        // Զույգի ստուգում
+        function checkMatch() {
+            const [card1, card2] = flippedCards;
+            if (card1.dataset.symbol === card2.dataset.symbol) {
+                card1.classList.add('matched');
+                card2.classList.add('matched');
+                score += 10;
+                matchedPairs++;
+                if (matchedPairs === 8) {
+                    endGame();
+                }
+            } else {
+                score = Math.max(0, score - 5);
+                setTimeout(() => {
+                    card1.classList.remove('flipped');
+                    card2.classList.remove('flipped');
+                    card1.textContent = '';
+                    card2.textContent = '';
+                }, 1000);
+            }
+            scoreDisplay.textContent = score;
+            flippedCards = [];
+        }
+
+        // Խաղի ավարտ
+        function endGame() {
+            if (score > highScore) {
+                highScore = score;
+                highScoreDisplay.textContent = highScore;
+                localStorage.setItem('highScore', highScore);
+            }
+            finalScoreDisplay.textContent = score;
+            gameOverScreen.style.display = 'block';
+        }
+    </script>
+</body>
+
+</html>

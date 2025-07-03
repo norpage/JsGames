@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="shortcut icon" href="../images/favicon.png" type="image/x-icon">
+    <title>2048 Game</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background: linear-gradient(to bottom, #74ebd5, #acb6e5);
+            font-family: Arial, sans-serif;
+        }
+
+        #gameContainer {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+            text-align: center;
+        }
+
+        #gameBoard {
+            display: grid;
+            grid-template-columns: repeat(4, 80px);
+            gap: 10px;
+            background-color: #bbada0;
+            padding: 10px;
+            border-radius: 10px;
+            margin: 20px auto;
+        }
+
+        .tile {
+            width: 80px;
+            height: 80px;
+            background-color: #cdc1b4;
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: bold;
+            color: #776e65;
+            transition: all 1.8s ease;
+            /* Դանդաղեցված անիմացիա */
+        }
+
+        .tile[data-value="2"] {
+            background-color: #eee4da;
+        }
+
+        .tile[data-value="4"] {
+            background-color: #ede0c8;
+        }
+
+        .tile[data-value="8"] {
+            background-color: #f2b179;
+        }
+
+        .tile[data-value="16"] {
+            background-color: #f59563;
+        }
+
+        .tile[data-value="32"] {
+            background-color: #f67c5f;
+        }
+
+        .tile[data-value="64"] {
+            background-color: #f65e3b;
+        }
+
+        .tile[data-value="128"] {
+            background-color: #edcf72;
+        }
+
+        .tile[data-value="256"] {
+            background-color: #edcc61;
+        }
+
+        .tile[data-value="512"] {
+            background-color: #edc850;
+        }
+
+        .tile[data-value="1024"] {
+            background-color: #edc53f;
+        }
+
+        .tile[data-value="2048"] {
+            background-color: #edc22e;
+        }
+
+        .tile.new {
+            animation: appear 0.4s ease;
+            /* Դանդաղեցված հայտնվել */
+        }
+
+        .tile.merged {
+            animation: pop 0.4s ease;
+            /* Դանդաղեցված միավորում */
+        }
+
+        @keyframes appear {
+            from {
+                transform: scale(0);
+                opacity: 0;
+            }
+
+            to {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        @keyframes pop {
+            0% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.2);
+            }
+
+            100% {
+                transform: scale(1);
+            }
+        }
+
+        #scoreBoard {
+            margin: 20px 0;
+        }
+
+        #scoreBoard p {
+            margin: 5px;
+            font-size: 18px;
+            color: #333;
+        }
+
+        button {
+            padding: 12px 24px;
+            font-size: 16px;
+            background-color: #4caf50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        #gameOver {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        #gameOver h2 {
+            margin: 0 0 10px;
+        }
+
+        .menu-button {
+            display: inline-block;
+            padding: 12px 24px;
+            font-size: 16px;
+            background-color: #ff9800;
+            /* Տարբեր գույն՝ տարբերելու համար */
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            margin-top: 10px;
+            transition: background-color 0.3s;
+        }
+
+        .menu-button:hover {
+            background-color: #e68900;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="gameContainer">
+        <div id="scoreBoard">
+            <p>Score: <span id="score">0</span></p>
+            <p>High Score: <span id="highScore">0</span></p>
+        </div>
+        <div id="gameBoard"></div>
+        <button id="startButton" onclick="startGame()">Start Game</button>
+        <a href="../games.html" class="menu-button">Back to Menu</a>
+
+        <div id="gameOver">
+            <h2>Game Over!</h2>
+            <p>Your Score: <span id="finalScore">0</span></p>
+            <button onclick="startGame()">Play Again</button>
+        </div>
+    </div>
+
+    <script>
+        const gameBoard = document.getElementById('gameBoard');
+        const scoreDisplay = document.getElementById('score');
+        const highScoreDisplay = document.getElementById('highScore');
+        const gameOverScreen = document.getElementById('gameOver');
+        const finalScoreDisplay = document.getElementById('finalScore');
+        const startButton = document.getElementById('startButton');
+
+        // Կարգավորումներ
+        const gridSize = 4;
+        let board = [];
+        let score = 0;
+        let highScore = localStorage.getItem('highScore') || 0;
+        let gameRunning = true;
+
+        highScoreDisplay.textContent = highScore;
+
+        // Խաղի մեկնարկ
+        function startGame() {
+            board = Array(gridSize).fill().map(() => Array(gridSize).fill(0));
+            score = 0;
+            scoreDisplay.textContent = score;
+            gameOverScreen.style.display = 'none';
+            startButton.textContent = 'Restart Game';
+            gameRunning = true;
+            addTile();
+            addTile();
+            drawBoard();
+        }
+
+        // Պատահական սալիկ
+        function addTile() {
+            const emptyCells = [];
+            for (let r = 0; r < gridSize; r++) {
+                for (let c = 0; c < gridSize; c++) {
+                    if (board[r][c] === 0) emptyCells.push({ r, c });
+                }
+            }
+            if (emptyCells.length > 0) {
+                const { r, c } = emptyCells[Math.floor(Math.random() * emptyCells.length)];
+                board[r][c] = Math.random() < 0.9 ? 2 : 4;
+                return { r, c, value: board[r][c] };
+            }
+            return null;
+        }
+
+        // Ցանցի նկարում
+        function drawBoard() {
+            gameBoard.innerHTML = '';
+            for (let r = 0; r < gridSize; r++) {
+                for (let c = 0; c < gridSize; c++) {
+                    const value = board[r][c];
+                    const tile = document.createElement('div');
+                    tile.classList.add('tile');
+                    tile.dataset.value = value;
+                    tile.textContent = value || '';
+                    gameBoard.appendChild(tile);
+                }
+            }
+            if (!canMove()) {
+                endGame();
+            }
+        }
+
+        // Շարժ
+        function move(direction) {
+            if (!gameRunning) return;
+            let moved = false;
+            const newBoard = board.map(row => [...row]);
+            const merges = [];
+
+            if (direction === 'left') {
+                for (let r = 0; r < gridSize; r++) {
+                    let row = board[r].filter(val => val);
+                    let newRow = [];
+                    for (let i = 0; i < row.length; i++) {
+                        if (i < row.length - 1 && row[i] === row[i + 1]) {
+                            const mergedValue = row[i] * 2;
+                            newRow.push(mergedValue);
+                            score += mergedValue;
+                            merges.push({ r, c: newRow.length - 1, value: mergedValue });
+                            i++;
+                            moved = true;
+                        } else {
+                            newRow.push(row[i]);
+                        }
+                    }
+                    while (newRow.length < gridSize) newRow.push(0);
+                    board[r] = newRow;
+                }
+            } else if (direction === 'right') {
+                for (let r = 0; r < gridSize; r++) {
+                    let row = board[r].filter(val => val).reverse();
+                    let newRow = [];
+                    for (let i = 0; i < row.length; i++) {
+                        if (i < row.length - 1 && row[i] === row[i + 1]) {
+                            const mergedValue = row[i] * 2;
+                            newRow.push(mergedValue);
+                            score += mergedValue;
+                            merges.push({ r, c: gridSize - newRow.length, value: mergedValue });
+                            i++;
+                            moved = true;
+                        } else {
+                            newRow.push(row[i]);
+                        }
+                    }
+                    while (newRow.length < gridSize) newRow.push(0);
+                    board[r] = newRow.reverse();
+                }
+            } else if (direction === 'up') {
+                for (let c = 0; c < gridSize; c++) {
+                    let col = [];
+                    for (let r = 0; r < gridSize; r++) {
+                        if (board[r][c]) col.push(board[r][c]);
+                    }
+                    let newCol = [];
+                    for (let i = 0; i < col.length; i++) {
+                        if (i < col.length - 1 && col[i] === col[i + 1]) {
+                            const mergedValue = col[i] * 2;
+                            newCol.push(mergedValue);
+                            score += mergedValue;
+                            merges.push({ r: newCol.length - 1, c, value: mergedValue });
+                            i++;
+                            moved = true;
+                        } else {
+                            newCol.push(col[i]);
+                        }
+                    }
+                    for (let r = 0; r < gridSize; r++) {
+                        board[r][c] = newCol[r] || 0;
+                    }
+                }
+            } else if (direction === 'down') {
+                for (let c = 0; c < gridSize; c++) {
+                    let col = [];
+                    for (let r = gridSize - 1; r >= 0; r--) {
+                        if (board[r][c]) col.push(board[r][c]);
+                    }
+                    let newCol = [];
+                    for (let i = 0; i < col.length; i++) {
+                        if (i < col.length - 1 && col[i] === col[i + 1]) {
+                            const mergedValue = col[i] * 2;
+                            newCol.push(mergedValue);
+                            score += mergedValue;
+                            merges.push({ r: gridSize - newCol.length, c, value: mergedValue });
+                            i++;
+                            moved = true;
+                        } else {
+                            newCol.push(col[i]);
+                        }
+                    }
+                    for (let r = gridSize - 1, i = 0; r >= 0; r--) {
+                        board[r][c] = newCol[i++] || 0;
+                    }
+                }
+            }
+
+            if (moved || JSON.stringify(newBoard) !== JSON.stringify(board)) {
+                const newTile = addTile();
+                scoreDisplay.textContent = score;
+                if (score > highScore) {
+                    highScore = score;
+                    highScoreDisplay.textContent = highScore;
+                    localStorage.setItem('highScore', highScore);
+                }
+                drawBoard();
+                // Կիրառել անիմացիաներ
+                if (newTile) {
+                    const index = newTile.r * gridSize + newTile.c;
+                    const tile = gameBoard.children[index];
+                    if (tile) {
+                        tile.classList.add('new');
+                        setTimeout(() => tile.classList.remove('new'), 400); // Համապատասխանեցված դանդաղ անիմացիային
+                    }
+                }
+                merges.forEach(merge => {
+                    const index = merge.r * gridSize + merge.c;
+                    const tile = gameBoard.children[index];
+                    if (tile && parseInt(tile.dataset.value) === merge.value) {
+                        tile.classList.add('merged');
+                        setTimeout(() => tile.classList.remove('merged'), 400); // Համապատասխանեցված դանդաղ անիմացիային
+                    }
+                });
+            } else {
+                drawBoard();
+            }
+        }
+
+        // Շարժի հնարավորության ստուգում
+        function canMove() {
+            for (let r = 0; r < gridSize; r++) {
+                for (let c = 0; c < gridSize; c++) {
+                    if (board[r][c] === 0) return true;
+                    if (c < gridSize - 1 && board[r][c] === board[r][c + 1]) return true;
+                    if (r < gridSize - 1 && board[r][c] === board[r + 1][c]) return true;
+                }
+            }
+            return false;
+        }
+
+        // Խաղի ավարտ
+        function endGame() {
+            gameRunning = false;
+            gameOverScreen.style.display = 'block';
+            finalScoreDisplay.textContent = score;
+        }
+
+        // Ստեղնաշարի կառավարում
+        document.addEventListener('keydown', e => {
+            if (!gameRunning) return;
+            switch (e.key) {
+                case 'ArrowUp':
+                    move('up');
+                    break;
+                case 'ArrowDown':
+                    move('down');
+                    break;
+                case 'ArrowLeft':
+                    move('left');
+                    break;
+                case 'ArrowRight':
+                    move('right');
+                    break;
+            }
+        });
+    </script>
+</body>
+
+</html>

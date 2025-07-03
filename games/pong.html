@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="shortcut icon" href="../images/favicon.png" type="image/x-icon">
+    <title>Pong Game</title>
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background: linear-gradient(to bottom, #74ebd5, #acb6e5);
+            font-family: Arial, sans-serif;
+        }
+
+        #gameContainer {
+            max-width: 640px;
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.2);
+            text-align: center;
+        }
+
+        canvas {
+            border: 3px solid #333;
+            border-radius: 10px;
+        }
+
+        #scoreBoard {
+            margin: 20px 0;
+            display: flex;
+            justify-content: space-between;
+            width: 300px;
+        }
+
+        #scoreBoard p {
+            margin: 5px;
+            font-size: 18px;
+            color: #333;
+        }
+
+        button {
+            padding: 12px 24px;
+            font-size: 16px;
+            background-color: #4caf50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #45a049;
+        }
+
+        #gameOver {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        #gameOver h2 {
+            margin: 0 0 10px;
+        }
+
+        .menu-button {
+            display: inline-block;
+            padding: 12px 24px;
+            font-size: 16px;
+            background-color: #ff9800;
+            /* Տարբեր գույն՝ տարբերելու համար */
+            color: white;
+            text-decoration: none;
+            border-radius: 5px;
+            margin-top: 10px;
+            transition: background-color 0.3s;
+        }
+
+        .menu-button:hover {
+            background-color: #e68900;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="gameContainer">
+        <div id="scoreBoard">
+            <p>Player: <span id="playerScore">0</span></p>
+            <p>Computer: <span id="computerScore">0</span></p>
+            <p>High Score: <span id="highScore">0</span></p>
+        </div>
+        <canvas id="gameCanvas" width="600" height="400"></canvas>
+        <button id="startButton" onclick="startGame()">Start Game</button>
+        <a href="../games.html" class="menu-button">Back to Menu</a>
+
+        <div id="gameOver">
+            <h2>Game Over!</h2>
+            <p>Your Score: <span id="finalScore">0</span></p>
+            <button onclick="startGame()">Play Again</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const playerScoreDisplay = document.getElementById('playerScore');
+        const computerScoreDisplay = document.getElementById('computerScore');
+        const highScoreDisplay = document.getElementById('highScore');
+        const gameOverScreen = document.getElementById('gameOver');
+        const finalScoreDisplay = document.getElementById('finalScore');
+        const startButton = document.getElementById('startButton');
+
+        // Կարգավորումներ
+        const paddleWidth = 10;
+        const paddleHeight = 60;
+        const ballSize = 10;
+        let playerPaddle = { x: 10, y: canvas.height / 2 - paddleHeight / 2, dy: 5 };
+        let computerPaddle = { x: canvas.width - 20, y: canvas.height / 2 - paddleHeight / 2, dy: 4 };
+        let ball = { x: canvas.width / 2, y: canvas.height / 2, dx: 5, dy: 5 };
+        let playerScore = 0;
+        let computerScore = 0;
+        let highScore = localStorage.getItem('highScore') || 0;
+        let gameRunning = false;
+
+        highScoreDisplay.textContent = highScore;
+
+        // Խաղի մեկնարկ
+        function startGame() {
+            playerScore = 0;
+            computerScore = 0;
+            playerScoreDisplay.textContent = playerScore;
+            computerScoreDisplay.textContent = computerScore;
+            gameOverScreen.style.display = 'none';
+            startButton.textContent = 'Restart Game';
+            resetBall();
+            gameRunning = true;
+            gameLoop();
+        }
+
+        // Գնդակի վերականգնում
+        function resetBall() {
+            ball.x = canvas.width / 2;
+            ball.y = canvas.height / 2;
+            ball.dx = 5 * (Math.random() > 0.5 ? 1 : -1);
+            ball.dy = 5 * (Math.random() > 0.5 ? 1 : -1);
+        }
+
+        // Խաղի ցիկլ
+        function gameLoop() {
+            if (!gameRunning) return;
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Թարմացնել վիճակը
+        function update() {
+            // Խաղացողի թիակ
+            if (keys.w && playerPaddle.y > 0) {
+                playerPaddle.y -= playerPaddle.dy;
+            }
+            if (keys.s && playerPaddle.y < canvas.height - paddleHeight) {
+                playerPaddle.y += playerPaddle.dy;
+            }
+
+            // Համակարգչի թիակ (պարզ AI)
+            if (computerPaddle.y + paddleHeight / 2 < ball.y) {
+                computerPaddle.y += computerPaddle.dy;
+            } else if (computerPaddle.y + paddleHeight / 2 > ball.y) {
+                computerPaddle.y -= computerPaddle.dy;
+            }
+            computerPaddle.y = Math.max(0, Math.min(canvas.height - paddleHeight, computerPaddle.y));
+
+            // Գնդակի շարժ
+            ball.x += ball.dx;
+            ball.y += ball.dy;
+
+            // Բախում պատերի հետ
+            if (ball.y <= 0 || ball.y >= canvas.height - ballSize) {
+                ball.dy *= -1;
+            }
+
+            // Բախում թիակների հետ
+            if (
+                (ball.x <= playerPaddle.x + paddleWidth &&
+                    ball.y + ballSize >= playerPaddle.y &&
+                    ball.y <= playerPaddle.y + paddleHeight) ||
+                (ball.x + ballSize >= computerPaddle.x &&
+                    ball.y + ballSize >= computerPaddle.y &&
+                    ball.y <= computerPaddle.y + paddleHeight)
+            ) {
+                ball.dx *= -1;
+            }
+
+            // Միավորների հաշվարկ
+            if (ball.x < 0) {
+                computerScore++;
+                computerScoreDisplay.textContent = computerScore;
+                resetBall();
+            } else if (ball.x > canvas.width) {
+                playerScore++;
+                playerScoreDisplay.textContent = playerScore;
+                if (playerScore > highScore) {
+                    highScore = playerScore;
+                    highScoreDisplay.textContent = highScore;
+                    localStorage.setItem('highScore', highScore);
+                }
+                resetBall();
+            }
+
+            // Խաղի ավարտ
+            if (computerScore >= 5) {
+                gameRunning = false;
+                gameOverScreen.style.display = 'block';
+                finalScoreDisplay.textContent = playerScore;
+            }
+        }
+
+        // Նկարել
+        function draw() {
+            ctx.fillStyle = '#f0f0f0';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Թիակներ
+            ctx.fillStyle = '#4caf50';
+            ctx.fillRect(playerPaddle.x, playerPaddle.y, paddleWidth, paddleHeight);
+            ctx.fillRect(computerPaddle.x, computerPaddle.y, paddleWidth, paddleHeight);
+
+            // Գնդակ
+            ctx.fillStyle = '#ff4444';
+            ctx.beginPath();
+            ctx.arc(ball.x, ball.y, ballSize / 2, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Կենտրոնական գիծ
+            ctx.strokeStyle = '#333';
+            ctx.setLineDash([5, 15]);
+            ctx.beginPath();
+            ctx.moveTo(canvas.width / 2, 0);
+            ctx.lineTo(canvas.width / 2, canvas.height);
+            ctx.stroke();
+            ctx.setLineDash([]);
+        }
+
+        // Ստեղնաշարի կառավարում
+        const keys = { w: false, s: false };
+        document.addEventListener('keydown', e => {
+            if (e.key === 'ArrowUp') keys.w = true;
+            if (e.key === 'ArrowDown') keys.s = true;
+        });
+        document.addEventListener('keyup', e => {
+            if (e.key === 'ArrowUp') keys.w = false;
+            if (e.key === 'ArrowDown') keys.s = false;
+        });
+    </script>
+</body>
+
+</html>
